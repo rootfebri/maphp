@@ -5,7 +5,7 @@ A fast and efficient PHP version manager written in Rust. maphp allows you to ea
 ## Features
 
 - 🚀 **Fast**: Built with Rust for optimal performance
-- 📦 **Easy Installation**: Download and compile PHP versions automatically
+- 📦 **Easy Installation**: Download and compile PHP versions automatically [Read [PHP Dependency](https://github.com/php/php-src/?tab=readme-ov-file#building-php-source-code) required for your system to compile PHP]
 - 🔄 **Version Switching**: Seamlessly switch between installed PHP versions
 - 🗂️ **Clean Management**: Organized storage of PHP installations
 - 🎯 **Interactive CLI**: User-friendly command-line interface with fuzzy selection
@@ -16,7 +16,7 @@ A fast and efficient PHP version manager written in Rust. maphp allows you to ea
 ### Prerequisites
 
 - Rust (latest stable version)
-- Build tools for compiling PHP from source
+- [Build tools](https://github.com/php/php-src/?tab=readme-ov-file#building-php-source-code) for compiling PHP from source
 
 ### Build from Source
 
@@ -175,7 +175,7 @@ cargo fmt
 ## Platform Support
 
 - ✅ Linux
-- ✅ macOS
+- ✅ macOS (likely)
 - ❌ Windows (planned for future release)
 
 ## Contributing
