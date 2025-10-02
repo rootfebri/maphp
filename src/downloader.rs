@@ -1,5 +1,3 @@
-#![cfg_attr(debug_assertions, allow(unused))]
-
 use crate::static_const::{CLI, DOWNLOAD_HEADERS};
 use crate::static_const::{DOWNLOAD_URL, MIN_TAR_SIZE};
 use crate::{Maybe, dl_template};
@@ -8,10 +6,8 @@ use bytes::Bytes;
 use flate2::read::GzDecoder;
 use futures_util::stream::BoxStream;
 use futures_util::{Stream, StreamExt};
-use indicatif::{HumanBytes, ProgressBar, ProgressIterator};
+use indicatif::{HumanBytes, ProgressBar};
 use std::fs;
-use std::fs::read_dir;
-use std::io::Write;
 use std::path::{Component, Path, PathBuf};
 use std::pin::Pin;
 use std::task::Poll::Ready;
@@ -142,8 +138,6 @@ where
 
 const PREFIX: &str = "php-php-src";
 fn skip_if_prefix((pos, c): (usize, Component)) -> Option<Component> {
-  use std::ops::Not;
-
   (pos != 0 || !c.as_os_str().to_string_lossy().starts_with(PREFIX)).then_some(c)
 }
 
@@ -158,8 +152,6 @@ mod tests {
   use flate2::read::GzDecoder;
   use indicatif::HumanBytes;
   use std::fs;
-  use std::io::Read;
-  use std::path;
 
   #[test]
   fn text_extract() {
@@ -167,7 +159,7 @@ mod tests {
 
     fs::create_dir_all(TEST_DIR).unwrap();
 
-    let mut file = fs::File::open("php-php-src-php-8.4.11-0-ga42bbd3.tar.gz").unwrap();
+    let file = fs::File::open("php-php-src-php-8.4.11-0-ga42bbd3.tar.gz").unwrap();
     println!("Loaded {} tar file", HumanBytes(file.metadata().unwrap().len()));
 
     let mut tar = tar::Archive::new(GzDecoder::new(file));

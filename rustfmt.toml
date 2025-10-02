@@ -1,0 +1,4 @@
+# Do not change, be my guest and crate .rustfmt.toml for yourself then cargo will ignore this file
+tab_spaces = 2
+max_width = 150
+newline_style = "Unix"
