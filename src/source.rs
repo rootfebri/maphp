@@ -1,5 +1,5 @@
-use crate::Maybe;
 use crate::static_const::CLI;
+use crate::{Commands, Maybe};
 use anyhow::ensure;
 use indicatif::{ProgressBar, ProgressFinish, ProgressStyle};
 use std::borrow::Cow;
@@ -7,7 +7,7 @@ use std::fmt::{Display, Formatter};
 use std::path::PathBuf;
 use std::process::Stdio;
 use std::time::Duration;
-use tokio::io::{AsyncBufReadExt, AsyncReadExt, BufReader};
+use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::Command;
 
 #[derive(Debug)]
@@ -62,23 +62,80 @@ impl SourcePHP {
     Ok(())
   }
 
+  fn get_args(&self) -> Vec<String> {
+    macro_rules! emit {
+      ($ident:ident, $a:ident $(,)?) => {
+        if $ident {
+          $a.push(::core::concat!("--", ::core::stringify!($ident)).replace("_", "-"));
+        }
+      };
+      (PathBuf($value:ident), $vec:ident $(,)?) => {
+        if $value.as_os_str() == "default" {
+          $vec.push(::core::concat!("--", ::core::stringify!($value)).replace("_", "-"));
+        } else if !$value.as_os_str().is_empty() {
+          $vec.push(::core::concat!("--", ::core::stringify!($value), "=").replace("_", "-") + $value.as_os_str().to_str().unwrap());
+        }
+      };
+    }
+
+    let Commands::Install {
+      enable_calendar,
+      enable_intl,
+      enable_mbstring,
+      enable_pcntl,
+      enable_bcmath,
+      enable_mysqlnd,
+      with_curl,
+      with_openssl,
+      with_pear,
+      with_zip,
+      with_zlib,
+      with_password_argon2,
+      ref with_mysqli,
+      ref with_pdo_mysqli,
+      ref with_pgsql,
+      ref with_pdo_pgsql,
+      ref configure_args,
+      ..
+    } = CLI.command
+    else {
+      unreachable!("Unreachable code!")
+    };
+
+    let mut args = vec![];
+    emit!(enable_calendar, args);
+    emit!(enable_intl, args);
+    emit!(enable_mbstring, args);
+    emit!(enable_pcntl, args);
+    emit!(enable_bcmath, args);
+    emit!(enable_mysqlnd, args);
+    emit!(with_curl, args);
+    emit!(with_openssl, args);
+    emit!(with_pear, args);
+    emit!(with_zip, args);
+    emit!(with_zlib, args);
+    emit!(with_password_argon2, args);
+
+    emit!(PathBuf(with_mysqli), args);
+    emit!(PathBuf(with_pdo_mysqli), args);
+    emit!(PathBuf(with_pgsql), args);
+    emit!(PathBuf(with_pdo_pgsql), args);
+
+    args.push(configure_args.join(" "));
+    args
+  }
+
   async fn configure(&self) -> Maybe<()> {
     let mut configure = Command::new("./configure");
-    let cmd = configure
-      .arg("--prefix")
-      .arg(self.0.join("dist"))
-      .arg("--with-curl")
-      .arg("--with-openssl")
-      .arg("--with-pear")
-      .arg("--with-zip")
-      .arg("--enable-mbstring")
-      .current_dir(&self.0);
-    let cmd = if CLI.command.is_dev() { cmd.arg("--enable-debug") } else { cmd };
+    let args = self.get_args();
+    let cmd = configure.arg("--prefix").arg(self.0.join("dist")).args(&args).current_dir(&self.0);
+    let cmd = if !CLI.command.is_dev() { cmd } else { cmd.arg("--enable-debug") };
 
     let prefix = format!(
-      "./configure --with-curl --with-openssl --with-pear --with-zip --enable-mbstring --prefix {} {}",
-      self.0.join("dist").display(),
-      if CLI.command.is_dev() { "--enable-debug" } else { "" }
+      "./configure --prefix {dist} {debug}{args}",
+      dist = self.0.join("dist").display(),
+      debug = if CLI.command.is_dev() { "--enable-debug " } else { " " },
+      args = args.join(" "),
     );
 
     self.run_with_spinner(prefix, cmd).await?;
@@ -134,9 +191,6 @@ impl SourcePHP {
     #[cfg(unix)]
     tokio::fs::symlink(self.0.join("dist/bin"), CLI.bin()).await?;
 
-    #[cfg(windows)]
-    tokio::fs::symlink_dir(self.0.join("dist/bin"), CLI.bin()).await?;
-
     Ok(())
   }
 
@@ -146,29 +200,22 @@ impl SourcePHP {
 
     let mut child = command.stdout(Stdio::piped()).stderr(Stdio::piped()).kill_on_drop(true).spawn()?;
     let stdout = child.stdout.take().expect("Unexpected STDIO piped stdout not found");
-    let mut stderr = child.stderr.take().expect("Unexpected STDIO piped stdout not found");
+    let stderr = child.stderr.take().expect("Unexpected STDIO piped stdout not found");
 
-    if !CLI.command.is_verbose() {
-      let status = child.wait().await?;
-
-      ensure!(status.success(), {
-        let mut output = [0u8; 256];
-        let size = stderr.read(&mut output).await?;
-        String::from_utf8_lossy(&output[..size]).into_owned()
-      });
-
-      return Ok(());
-    }
-
+    let verbose = CLI.command.is_verbose();
     let progress = spinner.clone();
     let stdout_handle = tokio::spawn(async move {
       let mut lines = BufReader::new(stdout).lines();
 
-      while let Ok(Some(line)) = lines.next_line().await {
-        progress.println(line);
+      while let Ok(Some(mut line)) = lines.next_line().await {
+        if verbose {
+          progress.println(line);
+        } else {
+          line.truncate(150);
+          progress.set_message(line);
+        }
       }
     });
-
     let progress = spinner.clone();
     let stderr_handle = tokio::spawn(async move {
       let mut lines = BufReader::new(stderr).lines();

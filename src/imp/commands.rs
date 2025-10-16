@@ -6,7 +6,7 @@ impl Commands {
   }
 
   pub fn is_dev(&self) -> bool {
-    matches!(*self, Self::Install { dev: true, .. })
+    matches!(*self, Self::Install { debug: true, .. })
   }
 
   pub fn is_force(&self) -> bool {

@@ -1,6 +1,3 @@
-#[cfg(windows)]
-compile_error!("Windows feature unimplemented yet");
-
 use crate::actions::list::ListArgs;
 use crate::downloader::Downloader;
 use crate::source::SourcePHP;
@@ -12,7 +9,7 @@ use indicatif::{HumanBytes, ProgressState, ProgressStyle};
 use std::env::var;
 use std::ffi::{OsStr, OsString};
 use std::fs::create_dir_all;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 type Maybe<T, E = anyhow::Error> = Result<T, E>;
 
@@ -202,15 +199,122 @@ fn strip_php(value: &str) -> Result<String, String> {
 pub enum Commands {
   /// Install PHP Version
   Install {
+    /// PHP Tag SemVer
     #[command()]
     #[arg(value_parser = strip_php)]
     tag: String,
+
+    /// Enable calendar extension
+    #[arg(long, default_value_t = true)]
+    enable_calendar: bool,
+
+    /// Enable intl extension
+    #[arg(long, default_value_t = true)]
+    enable_intl: bool,
+
+    /// Enable mbstring extension
+    #[arg(long, default_value_t = true)]
+    enable_mbstring: bool,
+
+    /// Enable pcntl extension
+    #[arg(long, default_value_t = true)]
+    enable_pcntl: bool,
+
+    /// Enable bcmath extension
+    #[arg(long, default_value_t = true)]
+    enable_bcmath: bool,
+
+    /// Enable mysqlnd
     #[arg(long, default_value_t = false)]
-    dev: bool,
+    enable_mysqlnd: bool,
+
+    /// Enable curl extension
+    #[arg(long, default_value_t = true)]
+    with_curl: bool,
+
+    /// Enable openssl extension
+    #[arg(long, default_value_t = true)]
+    with_openssl: bool,
+
+    /// Enable mysqli
+    #[arg(long,
+      num_args = 0..=1,
+      default_missing_value = Path::new("default").as_os_str(),
+      default_value = Path::new("").as_os_str(),
+      value_parser = triple_drip,
+      require_equals = true,
+      value_name = "DIR",
+      hide_default_value = true,
+    )]
+    with_mysqli: PathBuf,
+
+    /// Enable PDO mysqli
+    #[arg(long,
+      num_args = 0..=1,
+      default_missing_value = Path::new("default").as_os_str(),
+      default_value = Path::new("").as_os_str(),
+      value_parser = triple_drip,
+      require_equals = true,
+      value_name = "DIR",
+      hide_default_value = true,
+    )]
+    with_pdo_mysqli: PathBuf,
+
+    /// Enable pgsql
+    #[arg(long,
+      num_args = 0..=1,
+      default_missing_value = Path::new("default").as_os_str(),
+      default_value = Path::new("").as_os_str(),
+      value_parser = triple_drip,
+      require_equals = true,
+      value_name = "DIR",
+      hide_default_value = true,
+    )]
+    with_pgsql: PathBuf,
+
+    /// Enable PDO pgsql
+    #[arg(long,
+      num_args = 0..=1,
+      default_missing_value = Path::new("default").as_os_str(),
+      default_value = Path::new("").as_os_str(),
+      value_parser = triple_drip,
+      require_equals = true,
+      value_name = "DIR",
+      hide_default_value = true,
+    )]
+    with_pdo_pgsql: PathBuf,
+
+    /// Enable pear extension
+    #[arg(long, default_value_t = true)]
+    with_pear: bool,
+
+    /// Enable zip extension
+    #[arg(long, default_value_t = true)]
+    with_zip: bool,
+
+    /// Enable zlib extension
+    #[arg(long, default_value_t = true)]
+    with_zlib: bool,
+
+    /// Enable password_argon2 extension
+    #[arg(long, default_value_t = true)]
+    with_password_argon2: bool,
+
+    ///Enable debug build
+    #[arg(long, default_value_t = false)]
+    debug: bool,
+
+    /// Show more output build
     #[arg(long, default_value_t = false)]
     verbose: bool,
+
+    /// Force rebuild
     #[arg(long, default_value_t = false)]
     force: bool,
+
+    /// Pass additional args to configure
+    #[arg(long, trailing_var_arg = true, num_args = 0.., allow_hyphen_values = true, allow_negative_numbers = true)]
+    configure_args: Vec<String>,
   },
 
   /// Removes installed PHP Version
@@ -229,9 +333,8 @@ pub enum Commands {
   },
 }
 
-#[tokio::main]
-async fn main() -> Maybe<()> {
-  CLI.run().await
+fn triple_drip(value: &str) -> Result<PathBuf, String> {
+  if value.is_empty() { Ok(PathBuf::new()) } else { Ok(value.into()) }
 }
 
 fn dl_template() -> ProgressStyle {
@@ -242,4 +345,9 @@ fn dl_template() -> ProgressStyle {
       write!(w, "{}/s", HumanBytes(persec)).unwrap()
     })
     .progress_chars("#>-")
+}
+
+#[tokio::main]
+async fn main() -> Maybe<()> {
+  CLI.run().await
 }
